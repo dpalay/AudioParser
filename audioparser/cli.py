@@ -199,12 +199,25 @@ def main(argv: list[str] | None = None) -> int:
         else align.turns_only_utterances(turns)
     )
 
+    # per-utterance attribution confidence (labels must still match the
+    # diarizer's embedding keys, so score before renaming speakers)
+    from . import confidence as confidence_mod
+    confidence_mod.score_utterances(utterances, samples, sr, embeddings)
+    shaky = [
+        u for u in utterances
+        if u.confidence is not None and u.confidence < confidence_mod.LOW_CONFIDENCE
+    ]
+    if shaky:
+        print(f"  {len(shaky)}/{len(utterances)} turns have low attribution confidence")
+
     # --- speaker identification against the persistent voice registry ---
+    mapping: dict[str, str] = {}
+    id_scores: dict[str, float] = {}
     if not args.no_identify:
         registry = voices.VoiceRegistry(args.voices_db, threshold=args.match_threshold)
-        mapping, unknown = voices.identify_speakers(registry, embeddings)
+        mapping, unknown, id_scores = voices.identify_speakers(registry, embeddings)
         for label, name in mapping.items():
-            print(f"Recognized {label} as {name}")
+            print(f"Recognized {label} as {name} (similarity {id_scores[label]:.2f})")
 
         if unknown and not args.non_interactive and sys.stdin.isatty():
             texts = {
@@ -226,7 +239,12 @@ def main(argv: list[str] | None = None) -> int:
     # --- outputs ---
     output.write_markdown(utterances, out_dir / "transcript.md", in_path.name)
     output.write_text(utterances, out_dir / "transcript.txt")
-    output.write_json(utterances, out_dir / "transcript.json", in_path.name)
+    output.write_json(
+        utterances, out_dir / "transcript.json", in_path.name,
+        identification={
+            mapping.get(lab, lab): s for lab, s in id_scores.items()
+        } if not args.no_identify else None,
+    )
     output.write_srt(utterances, out_dir / "transcript.srt")
 
     if not args.no_split:

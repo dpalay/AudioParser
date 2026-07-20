@@ -39,6 +39,9 @@ class Utterance:
     end: float
     speaker: str
     words: list[Word] = field(default_factory=list)
+    # probability (0-1, among detected speakers) that this utterance's audio
+    # really belongs to the assigned speaker; None when too short to score
+    confidence: float | None = None
 
     @property
     def text(self) -> str:
@@ -49,6 +52,7 @@ class Utterance:
             "start": round(self.start, 3),
             "end": round(self.end, 3),
             "speaker": self.speaker,
+            "confidence": round(self.confidence, 3) if self.confidence is not None else None,
             "text": self.text,
             "words": [asdict(w) for w in self.words],
         }

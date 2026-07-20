@@ -40,9 +40,11 @@ def test_identify_speakers_unique_assignment(tmp_path):
         "SPEAKER_01": alice + 0.01 * _vec(51),
         "SPEAKER_02": _vec(77),  # a stranger
     }
-    mapping, unknown = identify_speakers(reg, embeddings)
+    mapping, unknown, scores = identify_speakers(reg, embeddings)
     assert mapping == {"SPEAKER_00": "Bob", "SPEAKER_01": "Alice"}
     assert unknown == ["SPEAKER_02"]
+    assert set(scores) == {"SPEAKER_00", "SPEAKER_01"}
+    assert all(s > 0.9 for s in scores.values())
 
 
 def test_same_person_not_assigned_twice(tmp_path):
@@ -53,7 +55,7 @@ def test_same_person_not_assigned_twice(tmp_path):
         "SPEAKER_00": alice + 0.001 * _vec(50),
         "SPEAKER_01": alice + 0.2 * _vec(51),
     }
-    mapping, unknown = identify_speakers(reg, embeddings)
+    mapping, unknown, _scores = identify_speakers(reg, embeddings)
     assert mapping["SPEAKER_00"] == "Alice"
     assert "SPEAKER_01" in unknown
 

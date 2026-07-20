@@ -238,6 +238,28 @@ Accuracy notes: the builtin backend is lightweight and does well on clean
 recordings with distinct voices; for overlapping speech, far-field mics, or
 many similar voices, use `--backend pyannote`.
 
+## Confidence scores
+
+Two confidences are reported:
+
+- **Identification similarity** (per speaker) — how well the voice matched
+  the registry entry it was named from. Printed at run time
+  (`Recognized SPEAKER_00 as Dave (similarity 0.91)`) and stored under
+  `speakers.<name>.identification_similarity` in `transcript.json`.
+- **Attribution confidence** (per utterance) — each turn's audio is
+  re-fingerprinted and compared against every detected speaker; a softmax
+  over the similarities gives the probability that the turn belongs to the
+  speaker it was assigned to. Stored as `confidence` on every utterance in
+  `transcript.json`; turns below 0.6 are marked `[?]` in `transcript.md`
+  (with a legend telling the LLM to treat those speaker names as
+  uncertain). Turns shorter than 0.4s are left unscored — too little
+  audio to fingerprint meaningfully.
+
+Low attribution confidence clusters where diarization is hardest:
+crosstalk, brief interjections, and turn boundaries. Note it is a
+*relative* measure among the speakers detected in the recording — it
+cannot flag a person the diarizer never separated out.
+
 ## Development
 
 ```bash

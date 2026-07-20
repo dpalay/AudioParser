@@ -6,6 +6,8 @@ from pathlib import Path
 
 from .types import Utterance
 
+LOW_CONFIDENCE = 0.6
+
 
 def _ts(seconds: float) -> str:
     m, s = divmod(int(seconds), 60)
@@ -43,10 +45,24 @@ def write_markdown(utterances: list[Utterance], path: Path, source_name: str) ->
             f"- **{speaker}** — {_ts(s['talk_time'])} talk time "
             f"({100 * s['talk_time'] / total:.0f}%), {s['turns']} turns"
         )
+    flagged = any(
+        u.confidence is not None and u.confidence < LOW_CONFIDENCE for u in utterances
+    )
     lines += ["", "## Transcript", ""]
+    if flagged:
+        lines += [
+            "_Turns marked `[?]` have low speaker-attribution confidence; "
+            "treat the speaker name as uncertain there._",
+            "",
+        ]
     for u in utterances:
         text = u.text or "(no transcription)"
-        lines.append(f"**{u.speaker}** [{_ts(u.start)}]: {text}")
+        marker = (
+            " `[?]`"
+            if u.confidence is not None and u.confidence < LOW_CONFIDENCE
+            else ""
+        )
+        lines.append(f"**{u.speaker}**{marker} [{_ts(u.start)}]: {text}")
         lines.append("")
     path.write_text("\n".join(lines))
 
@@ -59,10 +75,19 @@ def write_text(utterances: list[Utterance], path: Path) -> None:
     path.write_text("\n".join(lines) + "\n")
 
 
-def write_json(utterances: list[Utterance], path: Path, source_name: str) -> None:
+def write_json(
+    utterances: list[Utterance],
+    path: Path,
+    source_name: str,
+    identification: dict[str, float] | None = None,
+) -> None:
+    stats = speaker_stats(utterances)
+    for speaker, score in (identification or {}).items():
+        if speaker in stats:
+            stats[speaker]["identification_similarity"] = round(score, 3)
     payload = {
         "source": source_name,
-        "speakers": speaker_stats(utterances),
+        "speakers": stats,
         "utterances": [u.to_dict() for u in utterances],
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False))

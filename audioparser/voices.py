@@ -70,10 +70,11 @@ class VoiceRegistry:
 def identify_speakers(
     registry: VoiceRegistry,
     embeddings: dict[str, np.ndarray],
-) -> tuple[dict[str, str], list[str]]:
+) -> tuple[dict[str, str], list[str], dict[str, float]]:
     """Match each diarized speaker label against the registry.
 
-    Returns (label -> person name for matches, list of unmatched labels).
+    Returns (label -> person name for matches, list of unmatched labels,
+    label -> match similarity for the matched labels).
     Two labels never map to the same person; the better score wins.
     """
     scored: list[tuple[float, str, str]] = []
@@ -83,11 +84,13 @@ def identify_speakers(
             scored.append((hit[1], label, hit[0]))
 
     mapping: dict[str, str] = {}
+    scores: dict[str, float] = {}
     taken: set[str] = set()
-    for _, label, name in sorted(scored, reverse=True):
+    for score, label, name in sorted(scored, reverse=True):
         if name not in taken:
             mapping[label] = name
+            scores[label] = score
             taken.add(name)
 
     unknown = [label for label in embeddings if label not in mapping]
-    return mapping, unknown
+    return mapping, unknown, scores
