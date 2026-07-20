@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audioparser"
+version = "0.1.0"
+description = "Split a meeting recording by voice, identify speakers, and build an LLM-ready transcript"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "soundfile>=0.12",
+]
+
+[project.optional-dependencies]
+transcribe = ["faster-whisper>=1.0"]
+pyannote = ["pyannote.audio>=3.1", "torch>=2.0"]
+all = ["audioparser[transcribe,pyannote]"]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+audioparser = "audioparser.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["audioparser*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
