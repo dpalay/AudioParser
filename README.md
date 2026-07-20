@@ -100,6 +100,45 @@ Example `transcript.md`:
 **Sarah** [00:11]: I looked at the numbers last night and we're on track.
 ```
 
+## Setting up the pyannote backend (recommended for real meetings)
+
+The builtin backend struggles with crosstalk and far-field audio. pyannote
+handles overlapping speech and is the accuracy upgrade. One-time setup:
+
+1. Install the extras (pulls PyTorch, ~2 GB):
+
+   ```bash
+   pip install -e '.[pyannote]'
+   ```
+
+2. Create a free account at [huggingface.co](https://huggingface.co) and
+   accept the terms on **both** gated model pages (the pipeline uses the
+   second internally):
+   - https://huggingface.co/pyannote/speaker-diarization-3.1
+   - https://huggingface.co/pyannote/segmentation-3.0
+
+3. Create a **read** token at https://huggingface.co/settings/tokens and
+   export it:
+
+   ```bash
+   export HF_TOKEN=hf_xxx        # or pass --hf-token per run
+   ```
+
+4. Run:
+
+   ```bash
+   audioparser meeting.wav --backend pyannote
+   ```
+
+The first run downloads the models (a few hundred MB, cached in
+`~/.cache/huggingface` — offline afterwards). A CUDA GPU or Apple Silicon
+(MPS) is used automatically when available; on CPU expect roughly
+10-30 minutes for an hour of audio, a few minutes with acceleration.
+
+During overlapping speech pyannote emits overlapping turns for both
+speakers; each transcribed word is attributed to whichever turn it overlaps
+most, so brief interjections land with the interjector.
+
 ## Feeding it to an LLM
 
 `transcript.md` is designed to drop straight into a prompt:
@@ -109,6 +148,30 @@ Example `transcript.md`:
 
 For programmatic use, `transcript.json` has per-utterance timing and
 per-speaker talk-time stats.
+
+### `audioparser analyze` — send it to your LLM API automatically
+
+Works with any OpenAI-compatible endpoint, including org LLM proxies:
+
+```bash
+export AUDIOPARSER_LLM_BASE_URL=https://your-llm-proxy.example.com/v1
+export AUDIOPARSER_LLM_API_KEY=sk-...
+export AUDIOPARSER_LLM_MODEL=gpt-5.4      # whatever your proxy calls it
+
+audioparser analyze meeting_parsed/transcript.md
+```
+
+The default prompt asks for a summary, decisions, action items with owners,
+disagreements, and follow-ups; it writes `analysis.md` next to the
+transcript. Use `--prompt "..."` (or `--prompt prompt.txt`) to ask something
+else, and `--base-url/--model` to override the env vars per run.
+(`OPENAI_BASE_URL`/`OPENAI_API_KEY` are honored as fallbacks.)
+
+Notes for shared/org proxies: a one-hour transcript is roughly 10-15k
+tokens, so single-meeting analysis costs pennies per run on GPT-class
+models. Remember that transcripts contain your colleagues' names and
+words — check your org's data-handling rules (PII/PHI, regional
+restrictions) before sending, same as you would for any meeting notes.
 
 ## How speaker identification works
 

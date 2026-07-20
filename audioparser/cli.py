@@ -12,6 +12,7 @@ Pipeline:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -88,8 +89,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="number of speakers, if known (improves clustering)")
     p.add_argument("--backend", choices=["builtin", "pyannote"], default="builtin",
                    help="diarization backend (default: builtin)")
-    p.add_argument("--hf-token", default=None,
-                   help="Hugging Face token for the pyannote backend")
+    p.add_argument("--hf-token", default=os.environ.get("HF_TOKEN"),
+                   help="Hugging Face token for the pyannote backend "
+                   "(default: HF_TOKEN env var)")
     p.add_argument("--whisper-model", default="base",
                    help="faster-whisper model size (tiny/base/small/medium/large-v3)")
     p.add_argument("--language", default=None, help="spoken language hint, e.g. en")
@@ -111,7 +113,52 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def build_analyze_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="audioparser analyze",
+        description="Send a transcript to an OpenAI-compatible LLM API "
+        "(e.g. an org LLM proxy) for meeting analysis.",
+    )
+    p.add_argument("transcript", help="path to transcript.md (or .txt) from a parse run")
+    p.add_argument("--base-url", default=None,
+                   help="API base URL, e.g. https://llmproxy.example.com/v1 "
+                   "(default: AUDIOPARSER_LLM_BASE_URL or OPENAI_BASE_URL)")
+    p.add_argument("--model", default=None,
+                   help="model name as the proxy knows it "
+                   "(default: AUDIOPARSER_LLM_MODEL)")
+    p.add_argument("--prompt", default=None,
+                   help="custom analysis prompt; a file path is read as the prompt")
+    p.add_argument("-o", "--output", default=None,
+                   help="write the analysis here (default: analysis.md next to "
+                   "the transcript)")
+    return p
+
+
+def main_analyze(argv: list[str]) -> int:
+    from . import analyze as analyze_mod
+
+    args = build_analyze_parser().parse_args(argv)
+    prompt = args.prompt
+    if prompt and Path(prompt).is_file():
+        prompt = Path(prompt).read_text()
+
+    transcript_path = Path(args.transcript)
+    print(f"Analyzing {transcript_path} ...")
+    result = analyze_mod.analyze_transcript(
+        transcript_path, base_url=args.base_url, model=args.model, prompt=prompt
+    )
+    out_path = Path(args.output) if args.output else transcript_path.with_name("analysis.md")
+    out_path.write_text(result)
+    print(result)
+    print(f"\nSaved to {out_path}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+    if argv and argv[0] == "analyze":
+        return main_analyze(argv[1:])
     args = build_parser().parse_args(argv)
 
     in_path = Path(args.input)

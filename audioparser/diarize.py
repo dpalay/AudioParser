@@ -185,6 +185,11 @@ def _diarize_pyannote(
             "accept the model terms at https://huggingface.co/pyannote/speaker-diarization-3.1"
         )
 
+    if torch.cuda.is_available():
+        pipeline.to(torch.device("cuda"))
+    elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        pipeline.to(torch.device("mps"))
+
     waveform = torch.from_numpy(audio).float().unsqueeze(0)
     kwargs = {"num_speakers": num_speakers} if num_speakers else {}
     result = pipeline({"waveform": waveform, "sample_rate": sr}, **kwargs)
