@@ -165,8 +165,15 @@ def _merge_adjacent(turns: list[SpeakerTurn], gap: float = 0.4) -> list[SpeakerT
 # pyannote backend
 # --------------------------------------------------------------------------
 
+DEFAULT_PYANNOTE_MODEL = "pyannote/speaker-diarization-3.1"
+
+
 def _diarize_pyannote(
-    audio: np.ndarray, sr: int, num_speakers: int | None, hf_token: str | None
+    audio: np.ndarray,
+    sr: int,
+    num_speakers: int | None,
+    hf_token: str | None,
+    model: str = DEFAULT_PYANNOTE_MODEL,
 ) -> tuple[list[SpeakerTurn], Embeddings]:
     try:
         import torch
@@ -176,13 +183,18 @@ def _diarize_pyannote(
             "pyannote backend requires extras: pip install 'audioparser[pyannote]'"
         ) from exc
 
-    pipeline = Pipeline.from_pretrained(
-        "pyannote/speaker-diarization-3.1", use_auth_token=hf_token
-    )
+    from pathlib import Path
+
+    if Path(model).exists():
+        # local config.yaml -> fully offline, no token, no network
+        pipeline = Pipeline.from_pretrained(model)
+    else:
+        pipeline = Pipeline.from_pretrained(model, use_auth_token=hf_token)
     if pipeline is None:
         raise RuntimeError(
-            "Could not load pyannote/speaker-diarization-3.1. Pass --hf-token and "
-            "accept the model terms at https://huggingface.co/pyannote/speaker-diarization-3.1"
+            f"Could not load {model}. For the hosted model, pass --hf-token and "
+            "accept the terms at https://huggingface.co/pyannote/speaker-diarization-3.1; "
+            "for offline use, pass a local config.yaml path via --pyannote-model."
         )
 
     if torch.cuda.is_available():
@@ -230,9 +242,10 @@ def diarize(
     backend: str = "builtin",
     num_speakers: int | None = None,
     hf_token: str | None = None,
+    pyannote_model: str = DEFAULT_PYANNOTE_MODEL,
 ) -> tuple[list[SpeakerTurn], Embeddings]:
     if backend == "builtin":
         return _diarize_builtin(audio, sr, num_speakers)
     if backend == "pyannote":
-        return _diarize_pyannote(audio, sr, num_speakers, hf_token)
+        return _diarize_pyannote(audio, sr, num_speakers, hf_token, pyannote_model)
     raise ValueError(f"unknown diarization backend: {backend}")

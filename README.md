@@ -135,6 +135,58 @@ The first run downloads the models (a few hundred MB, cached in
 (MPS) is used automatically when available; on CPU expect roughly
 10-30 minutes for an hour of audio, a few minutes with acceleration.
 
+### What the token is for, and what leaves your machine
+
+The Hugging Face token is a **download credential only**. The pyannote
+authors gate their weights behind an accept-terms form; the token proves
+your account accepted so the one-time download is authorized. **Your audio
+is never uploaded anywhere** — diarization and transcription both run
+entirely on your machine. After the first download, no network is needed.
+
+To *guarantee* zero outbound traffic at runtime (skips even cache-freshness
+checks):
+
+```bash
+export HF_HUB_OFFLINE=1
+```
+
+### Fully air-gapped setup (no Hugging Face contact from this machine)
+
+If the processing machine can't touch the internet at all, fetch the models
+elsewhere and carry them over:
+
+1. On any internet-connected machine:
+
+   ```bash
+   pip install huggingface_hub
+   hf download pyannote/speaker-diarization-3.1 --local-dir models/diarization
+   hf download pyannote/segmentation-3.0        --local-dir models/segmentation
+   hf download pyannote/wespeaker-voxceleb-resnet34-LM --local-dir models/embedding
+   hf download Systran/faster-whisper-base      --local-dir models/whisper-base
+   ```
+
+   (Requires accepting the terms + a token once, on that machine.)
+
+2. In `models/diarization/config.yaml`, replace the two hub references with
+   the local paths you copied them to:
+
+   ```yaml
+   segmentation: /path/to/models/segmentation/pytorch_model.bin
+   embedding: /path/to/models/embedding/pytorch_model.bin
+   ```
+
+3. Copy `models/` to the offline machine and run:
+
+   ```bash
+   audioparser meeting.wav --backend pyannote \
+       --pyannote-model /path/to/models/diarization/config.yaml \
+       --whisper-model  /path/to/models/whisper-base
+   ```
+
+No token, no network, nothing outbound. The `analyze` step is the **only**
+part of this tool that sends data anywhere, and it only runs when you
+explicitly invoke it.
+
 During overlapping speech pyannote emits overlapping turns for both
 speakers; each transcribed word is attributed to whichever turn it overlaps
 most, so brief interjections land with the interjector.

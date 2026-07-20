@@ -92,6 +92,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--hf-token", default=os.environ.get("HF_TOKEN"),
                    help="Hugging Face token for the pyannote backend "
                    "(default: HF_TOKEN env var)")
+    p.add_argument("--pyannote-model", default=diarize_mod.DEFAULT_PYANNOTE_MODEL,
+                   help="pyannote pipeline: a hub name, or a local config.yaml "
+                   "path for fully offline use (no token, no network)")
     p.add_argument("--whisper-model", default="base",
                    help="faster-whisper model size (tiny/base/small/medium/large-v3)")
     p.add_argument("--language", default=None, help="spoken language hint, e.g. en")
@@ -175,6 +178,7 @@ def main(argv: list[str] | None = None) -> int:
         backend=args.backend,
         num_speakers=args.num_speakers,
         hf_token=args.hf_token,
+        pyannote_model=args.pyannote_model,
     )
     if not turns:
         print("No speech detected.", file=sys.stderr)
